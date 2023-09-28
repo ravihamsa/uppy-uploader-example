@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="
+https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js
+"></script>
+    <link href="https://releases.transloadit.com/uppy/v3.16.0/uppy.min.css" rel="stylesheet">
+</head>
+<body>
+
+<div id="my-plugin"></div>
+<div id="files-drag-drop"></div>
+<div id="uppy" style="height: 500px;"></div>
+<div id="informer" style="height: 500px;"></div>
+
+<script type="module">
+    import
+        * as BaseUppy
+        from "https://releases.transloadit.com/uppy/v3.16.0/uppy.min.mjs"
+
+    const {
+        Uppy,
+        AwsS3Multipart,
+        DragDrop,
+    } = BaseUppy
+
+
+    const uppy = new Uppy()
+    uppy.use(DragDrop, {target: '#uppy'})
+    uppy.use(AwsS3Multipart, {
+        limit: 2,
+        companionUrl: 'https://my-app.com',
+    })
+
+    const getTDHTML = (col, row)=> {
+        console.log(col, row);
+        if(col==='action'){
+            return `<td data-col="${col}"><button data-action="remove" data-id="${row.id}">Remove</button></td>`;
+        }
+        return `<td data-col="${col}">${row[col]}</td>`;
+    }
+
+    const generateHTMLTableFromJSON = (json) => {
+        let cols = Object.keys(json[0]);
+        cols.shift();
+        let headerRow = cols
+            .map(col => `<th>${col}</th>`)
+            .join("");
+
+        let rows = json
+            .map(row => {
+                let tds = cols.map(col => getTDHTML(col, row)).join("");
+                return `<tr>${tds}</tr>`;
+            })
+            .join("");
+
+        const table = `
+            <table>
+              <thead>
+                <tr>${headerRow}</tr>
+              <thead>
+              <tbody>
+                ${rows}
+              <tbody>
+            <table> <div><button data-action="start-all-upload">start upload</button></div>`;
+
+        return table;
+    }
+
+    const updateMyPlugin = () => {
+        const state = uppy.getState()
+        const target = document.querySelector('#my-plugin');
+        target.innerHTML = generateHTMLTableFromJSON(_.map(Object.values(state.files), (file) => {
+            return {
+                id: file.id,
+                name: file.meta.name,
+                size: file.size,
+                type: file.type,
+                progress: file.progress.percentage,
+                status: file.progress.uploadStarted ? 'uploading' : 'waiting',
+                action:''
+            }
+        }));
+
+    }
+
+    uppy.on('file-added', (file) => {
+        console.log('Added file', file);
+        updateMyPlugin();
+    });
+    uppy.on('file-removed', (file) => {
+        console.log('removed file', file);
+        console.log(uppy.getState())
+    });
+
+    uppy.on('progress', () => {
+        updateMyPlugin();
+    });
+    uppy.on('upload-success', () => {
+        updateMyPlugin();
+    });
+
+    document.querySelector('#my-plugin').addEventListener('click', e=>{
+        if(e.target && e.target.dataset && e.target.dataset.action){
+            const action = e.target.dataset.action;
+            const id = e.target.dataset.id;
+            if(action==='remove'){
+                uppy.removeFile(id);
+            }else if(action==='start-all-upload'){
+                uppy.upload();
+            }
+        }
+    })
+
+</script>
+</body>
+</html>
