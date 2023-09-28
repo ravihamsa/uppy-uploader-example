@@ -43,6 +43,9 @@ https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js
     }
 
     const generateHTMLTableFromJSON = (json) => {
+        if(json.length===0){
+            return '';
+        }
         let cols = Object.keys(json[0]);
         cols.shift();
         let headerRow = cols
